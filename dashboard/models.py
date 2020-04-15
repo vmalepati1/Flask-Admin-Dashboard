@@ -7,7 +7,7 @@ class Category(db.Model):
     Category_ID = db.Column(db.Integer, primary_key=True, autoincrement=False)
     Category_Name = db.Column(db.String(500))
     Parent_Category_ID = db.Column(db.Integer, db.ForeignKey('categories.Category_ID'))
-    ICON_URL = db.Column(db.String(500))
+    img_url = db.Column('ICON_URL', db.String(500))
     Created_at = db.Column(db.TIMESTAMP)
     Modified_at = db.Column(db.TIMESTAMP)
     # Add cascade relationship for referential integrity
@@ -37,6 +37,7 @@ class Company(db.Model):
     def __repr__(self):
         return '<Company %r>' % self.Company_Name
 
+# Association table of company to categories - one to many - 
 class CategoryCompanyAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     Company_ID = db.Column(db.Integer, db.ForeignKey('company.Company_ID'), primary_key=True)
