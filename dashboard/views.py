@@ -6,11 +6,12 @@ from dashboard.forms import *
 from dashboard.config import UPLOADED_IMAGES_DEST, UPLOADED_IMAGES_URL
 from flask_admin import Admin, AdminIndexView, expose, helpers, form
 from flask_admin.contrib.sqla import ModelView
+from flask_admin.contrib.sqla.view import func
 from sqlalchemy import event
 from sqlalchemy.event import listen
 from werkzeug.utils import secure_filename
 import os.path as op
-from dashboard.utils import delete_img, _list_thumbnail, _imagename_uuid1_gen
+from dashboard.utils import *
 
 # Directs user to admin
 @app.route('/')
@@ -57,20 +58,26 @@ class CategoriesView(ModelView):
     column_labels = {'img_url': 'Icon URL'}
     column_list = form_columns + ('icon', 'Created_at', 'Modified_at')
     form_extra_fields = {
-        'img_url': form.ImageUploadField(base_path=UPLOADED_IMAGES_DEST, url_relative_path='img/')
+        'img_url': form.ImageUploadField(base_path=UPLOADED_IMAGES_DEST, url_relative_path='img/', namegen=imagename_uuid1_gen)
     }
     column_formatters = {
-        'icon': _list_thumbnail,
+        'icon': list_thumbnail,
         'img_url': lambda v, c, m, p: images.url(m.img_url) if m.img_url else None
     }
+
+    def on_model_change(self, form, model, is_created):
+        manage_updates(model, is_created)
     
     def is_accessible(self):
         return login.current_user.is_authenticated and login.current_user.IS_admin
 
 class CategoryToCompanyAssignmentView(ModelView):
-    
+
     form_columns = ('Company_ID', 'Category_ID')
-    column_list = tuple(form_columns)
+    column_labels = {'parent_com.Company_Name': 'Company Name',
+                     'parent_cat.Category_Name': 'Category Name'}
+    column_searchable_list = ['Category_ID', 'parent_com.Company_Name', 'parent_cat.Category_Name']
+    column_list = ['id', 'Company_ID'] + column_searchable_list
 
     def is_accessible(self):
         return login.current_user.is_authenticated and login.current_user.IS_admin
@@ -78,15 +85,145 @@ class CategoryToCompanyAssignmentView(ModelView):
 class CompanyView(ModelView):
 
     column_display_pk = True
-    form_excluded_columns = ('children')
+    column_labels = {'img_url': 'Logo URL'}
+    form_columns = ['Company_ID', 'Company_Name', 'Address1', 'Address2', 'City', 'State',
+                   'Country', 'Phone1', 'Cell_note', 'img_url']
+    column_list = form_columns + ['logo']
+    form_extra_fields = {
+        'img_url': form.ImageUploadField(base_path=UPLOADED_IMAGES_DEST, url_relative_path='img/', namegen=imagename_uuid1_gen)
+    }
+    column_formatters = {
+        'logo': list_thumbnail,
+        'img_url': lambda v, c, m, p: images.url(m.img_url) if m.img_url else None
+    }
+    column_searchable_list = ['Company_Name']
+
+    @property
+    def can_create(self):
+        return login.current_user.IS_admin
+
+    @property
+    def can_delete(self):
+        return login.current_user.IS_admin
+    
+    def get_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(self.model)
+        
+        return self.session.query(self.model).filter(self.model.Company_ID==login.current_user.Company_ID)
+
+    def get_count_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(func.count('*'))
+        
+        return self.session.query(func.count('*')).filter(self.model.Company_ID==login.current_user.Company_ID)
 
     def is_accessible(self):
-        return login.current_user.is_authenticated and login.current_user.IS_admin
+        return login.current_user.is_authenticated
+
+class CompanyDeliveryView(ModelView):
+
+    column_searchable_list = ['parent_com.Company_Name', 'delivery_name', 'delivery_desc', 'delivery_cost']
+    column_labels = {'parent_com.Company_Name': 'Company Name'}
+    form_columns = ['Company_ID', 'delivery_name', 'delivery_desc', 'delivery_cost']
+    column_list = ['delivery_id', 'Company_ID'] + column_searchable_list
+    
+    @property
+    def can_create(self):
+        return login.current_user.IS_admin
+
+    @property
+    def can_delete(self):
+        return login.current_user.IS_admin
+    
+    def get_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(self.model)
+        
+        return self.session.query(self.model).filter(self.model.Company_ID==login.current_user.Company_ID)
+
+    def get_count_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(func.count('*'))
+        
+        return self.session.query(func.count('*')).filter(self.model.Company_ID==login.current_user.Company_ID)
+
+    def is_accessible(self):
+        return login.current_user.is_authenticated
+
+class CompanyTimetableView(ModelView):
+
+    column_searchable_list = ['parent_com.Company_Name']
+    column_labels = {'parent_com.Company_Name': 'Company Name'}
+    form_columns = ['Company_ID', 'weekday', 'open_time', 'close_time']
+    column_list = ['timetable_id', 'Company_ID', 'parent_com.Company_Name'] + form_columns[1:]
+    
+    @property
+    def can_create(self):
+        return login.current_user.IS_admin
+
+    @property
+    def can_delete(self):
+        return login.current_user.IS_admin
+    
+    def get_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(self.model)
+        
+        return self.session.query(self.model).filter(self.model.Company_ID==login.current_user.Company_ID)
+
+    def get_count_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(func.count('*'))
+        
+        return self.session.query(func.count('*')).filter(self.model.Company_ID==login.current_user.Company_ID)
+
+    def is_accessible(self):
+        return login.current_user.is_authenticated
+
+class OperatorView(ModelView):
+    column_searchable_list = ['Operator_ID', 'First_name', 'Last_name', 'Mobile_num',
+                              'Email', 'Username', 'parent_com.Company_Name']
+    column_labels = {'parent_com.Company_Name': 'Company Name'}
+    form_columns = ['First_name', 'Last_name', 'Mobile_num', 'Mobile_confirmed',
+                    'Email', 'Username', 'Password', 'Company_ID']
+    column_list = ['Operator_ID'] + form_columns[:5] + ['Created_at', 'Modified_at'] + \
+                    form_columns[6:] + ['parent_com.Company_Name', 'IS_admin']
+    
+    @property
+    def can_create(self):
+        return login.current_user.IS_admin
+
+    @property
+    def can_delete(self):
+        return login.current_user.IS_admin
+
+    def get_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(self.model)
+        
+        return self.session.query(self.model).filter(self.model.Operator_ID==login.current_user.Operator_ID)
+
+    def get_count_query(self):
+        if login.current_user.IS_admin:
+            return self.session.query(func.count('*'))
+        
+        return self.session.query(func.count('*')).filter(self.model.Operator_ID==login.current_user.Operator_ID)
+
+    def on_model_change(self, form, model, is_created):
+        manage_updates(model, is_created)
+    
+    def is_accessible(self):
+        return login.current_user.is_authenticated
 
 # Delete callbacks
 listen(Category, 'after_delete', delete_img)
+listen(Company, 'after_delete', delete_img)
 
 admin = Admin(app, 'Dashboard', index_view=HomeLoginView(), base_template='master.html')
 admin.add_view(CategoriesView(Category, db.session, category="Category"))
 admin.add_view(CategoryToCompanyAssignmentView(CategoryCompanyAssignment, db.session, category="Category", name='Category <-> Company'))
 admin.add_view(CompanyView(Company, db.session, category="Company"))
+admin.add_view(CompanyDeliveryView(CompanyDelivery, db.session, category="Company"))
+admin.add_view(CompanyTimetableView(CompanyTimetable, db.session, category="Company"))
+admin.add_view(OperatorView(Operator, db.session, category="Company"))

@@ -15,7 +15,7 @@ class Category(db.Model):
                 backref=backref("parent", remote_side=[Category_ID])
             )
 
-    child_assoc = db.relationship("CategoryCompanyAssignment", cascade="all, delete-orphan", uselist=False, back_populates="parent")
+    children_assoc = db.relationship("CategoryCompanyAssignment", back_populates="parent_cat", cascade="all, delete-orphan")
     
     def __repr__(self):
         return '<Category %r>' % self.Category_Name
@@ -30,23 +30,50 @@ class Company(db.Model):
     Country = db.Column(db.String(45))
     Phone1 = db.Column(db.String(100))
     Cell_note = db.Column(db.String(100))
-    Logo_URL = db.Column(db.String(500))
+    img_url = db.Column('Logo_URL', db.String(500))
 
-    children = db.relationship("CategoryCompanyAssignment", cascade="all, delete-orphan")
-
+    children_assoc = db.relationship("CategoryCompanyAssignment", back_populates="parent_com", cascade="all, delete-orphan")
+    children_deliv = db.relationship("CompanyDelivery", back_populates="parent_com", cascade="all, delete-orphan")
+    children_time = db.relationship("CompanyTimetable", back_populates="parent_com", cascade="all, delete-orphan")
+    children_op = db.relationship("Operator", back_populates="parent_com", cascade="all, delete-orphan")
+    
     def __repr__(self):
         return '<Company %r>' % self.Company_Name
 
-# Association table of company to categories - one to many - 
+# Association table of company to categories - many to many - 
 class CategoryCompanyAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     Company_ID = db.Column(db.Integer, db.ForeignKey('company.Company_ID'), primary_key=True)
     Category_ID = db.Column(db.Integer, db.ForeignKey('categories.Category_ID'), primary_key=True)
-
-    parent = db.relationship("Category", back_populates="child_assoc")
+    parent_com = db.relationship("Company", back_populates="children_assoc")
+    parent_cat = db.relationship("Category", back_populates="children_assoc")
 
     def __repr__(self):
         return '<Category <-> Company %r>' % self.id
+
+class CompanyDelivery(db.Model):
+    delivery_id = db.Column(db.Integer, primary_key=True)
+    Company_ID = db.Column(db.Integer, db.ForeignKey('company.Company_ID'))
+    delivery_name = db.Column(db.String(100))
+    delivery_desc = db.Column(db.String(500))
+    delivery_cost = db.Column(db.DECIMAL(2))
+
+    parent_com = db.relationship("Company", back_populates="children_deliv")
+
+    def __repr__(self):
+        return '<Company Delivery %r>' % self.delivery_id
+
+class CompanyTimetable(db.Model):
+    timetable_id = db.Column(db.Integer, primary_key=True)
+    Company_ID = db.Column(db.Integer, db.ForeignKey('company.Company_ID'))
+    weekday = db.Column(db.Integer)
+    open_time = db.Column(db.TIME)
+    close_time = db.Column(db.TIME)
+
+    parent_com = db.relationship("Company", back_populates="children_time")
+
+    def __repr__(self):
+        return '<Company Timetable %r>' % self.timetable_id
     
 class Operator(db.Model):
     __tablename__ = 'operators'
@@ -61,8 +88,10 @@ class Operator(db.Model):
     Modified_at = db.Column(db.TIMESTAMP)
     Username = db.Column(db.String(100))
     Password = db.Column(db.String(255))
-    Company_ID = db.Column(db.Integer)
+    Company_ID = db.Column(db.Integer, db.ForeignKey('company.Company_ID'))
     IS_admin = db.Column(db.Boolean)
+
+    parent_com = db.relationship("Company", back_populates="children_op")
 
     # By default, operators that have been instantiated are authenticated
     @property
