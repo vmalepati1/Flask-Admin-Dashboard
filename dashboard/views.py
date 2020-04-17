@@ -188,7 +188,7 @@ class OperatorView(ModelView):
     form_columns = ['First_name', 'Last_name', 'Mobile_num', 'Mobile_confirmed',
                     'Email', 'Username', 'Password', 'Company_ID']
     column_list = ['Operator_ID'] + form_columns[:5] + ['Created_at', 'Modified_at'] + \
-                    form_columns[6:] + ['parent_com.Company_Name', 'IS_admin']
+                  form_columns[6:] + ['parent_com.Company_Name', 'IS_admin']
     
     @property
     def can_create(self):
@@ -216,6 +216,25 @@ class OperatorView(ModelView):
     def is_accessible(self):
         return login.current_user.is_authenticated
 
+class CartView(ModelView):
+    column_searchable_list = ['User_ID', 'parent_user.First_name', 'parent_user.Last_name',
+                              'parent_user.Mobile_num', 'parent_user.Email', 'parent_user.Username']
+    form_columns = ['User_ID', 'Operator_ID', 'DatePlaced', 'HomeDelivery',
+                    'DateDelivery', 'Confirmed', 'Delivered', 'cart_note']
+    column_list = ['id', 'User_ID', 'parent_user.Username', 'Operator_ID', 'parent_op.Username'] + \
+                  form_columns[2:7] + ['Created_at', 'Modified_at', 'cart_note']
+    column_labels = {'parent_user.Username': 'User Username',
+                     'parent_op.Username': 'Operator Username',
+                     'DatePlaced': 'Date Placed',
+                     'HomeDelivery': 'Home Delivery',
+                     'DateDelivery': 'Date Delivery'}
+    
+    def on_model_change(self, form, model, is_created):
+        manage_updates(model, is_created)
+    
+    def is_accessible(self):
+        return login.current_user.is_authenticated
+
 # Delete callbacks
 listen(Category, 'after_delete', delete_img)
 listen(Company, 'after_delete', delete_img)
@@ -227,3 +246,4 @@ admin.add_view(CompanyView(Company, db.session, category="Company"))
 admin.add_view(CompanyDeliveryView(CompanyDelivery, db.session, category="Company"))
 admin.add_view(CompanyTimetableView(CompanyTimetable, db.session, category="Company"))
 admin.add_view(OperatorView(Operator, db.session, category="Company"))
+admin.add_view(CartView(Cart, db.session, category="Product"))
