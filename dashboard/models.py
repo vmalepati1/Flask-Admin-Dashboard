@@ -32,10 +32,13 @@ class Company(db.Model):
     Cell_note = db.Column(db.String(100))
     img_url = db.Column('Logo_URL', db.String(500))
 
+    categories = db.relationship('Category', secondary='category_company_assignment')
     children_assoc = db.relationship("CategoryCompanyAssignment", back_populates="parent_com", cascade="all, delete-orphan")
     children_deliv = db.relationship("CompanyDelivery", back_populates="parent_com", cascade="all, delete-orphan")
     children_time = db.relationship("CompanyTimetable", back_populates="parent_com", cascade="all, delete-orphan")
     children_op = db.relationship("Operator", back_populates="parent_com", cascade="all, delete-orphan")
+    children_cart_det = db.relationship("CartDetail", back_populates="parent_com", cascade="all, delete-orphan")
+    children_scat = db.relationship("ServicesCat", back_populates="parent_com", cascade="all, delete-orphan")
     
     def __repr__(self):
         return '<Company %r>' % self.Company_Name
@@ -95,7 +98,7 @@ class User(db.Model):
     Modified_at		 = db.Column(db.TIMESTAMP)
     Username		 = db.Column(db.String(100))
     Password		 = db.Column(db.String(255))
-    Photo_url		 = db.Column(db.String(500))
+    img_url		 = db.Column('Photo_url', db.String(500))
     invoice_need	 = db.Column(db.Boolean)
     invoice_name	 = db.Column(db.String(250))
     invoice_cf		 = db.Column(db.String(20))
@@ -129,6 +132,8 @@ class Cart(db.Model):
     parent_user = db.relationship("User", back_populates="children_cart")
     parent_op = db.relationship("Operator", back_populates="children_cart")
 
+    children_cart_det = db.relationship("CartDetail", back_populates="parent_cart", cascade="all, delete-orphan")
+
     def __repr__(self):
         return '<Cart %r>' % self.id
 
@@ -143,9 +148,58 @@ class Product(db.Model):
     Created_at			 = db.Column(db.TIMESTAMP)
     Modified_at			 = db.Column(db.TIMESTAMP)
 
+    children_cart_det = db.relationship("CartDetail", back_populates="parent_prod", cascade="all, delete-orphan")
+    children_pgal = db.relationship("ProductGallery", back_populates="parent_prod", cascade="all, delete-orphan")
+
     def __repr__(self):
         return '<Product %r>' % self.productName
+
+class CartDetail(db.Model):
+    id		= db.Column(db.Integer, primary_key=True)
+    Cart_ID	= db.Column(db.Integer, db.ForeignKey('cart.id'))
+    Prodcut_ID	= db.Column(db.Integer, db.ForeignKey('product.id'))
+    Company_ID	= db.Column(db.Integer, db.ForeignKey('company.Company_ID'))
+    Quantity	= db.Column(db.Integer)
+    DatePlaced	= db.Column(db.DATETIME)
+
+    parent_cart = db.relationship("Cart", back_populates="children_cart_det")
+    parent_prod = db.relationship("Product", back_populates="children_cart_det")
+    parent_com = db.relationship("Company", back_populates="children_cart_det")
+
+    def __repr__(self):
+        return '<Cart Detail %r>' % self.id
+
+class ProductGallery(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
+    img_url = db.Column('product_image', db.String(500))
+
+    parent_prod = db.relationship("Product", back_populates="children_pgal")
+
+class ServicesCat(db.Model):
+    Servicecat_ID 	= db.Column(db.Integer, primary_key=True)
+    Company_ID		= db.Column(db.Integer, db.ForeignKey('company.Company_ID'))
+    Category_Name	= db.Column(db.String(500))
+    Parent_Category_ID	= db.Column(db.Integer, db.ForeignKey('services_cat.Servicecat_ID'))
+    img_url		= db.Column('ICON_URL', db.String(500))
+    Created_at		= db.Column(db.TIMESTAMP)
+    Modified_at		= db.Column(db.TIMESTAMP)
+
+    children_int = db.relationship("ServicesCat", cascade="all, delete-orphan",
+                backref=backref("parent", remote_side=[Servicecat_ID])
+            )
     
+    parent_com = db.relationship("Company", back_populates="children_scat")
+
+class ServiceSlot(db.Model):
+    Slot_ID	    	= db.Column(db.Integer, primary_key=True)
+    Service_Slot_date	= db.Column(db.DATETIME)
+    Slot_Start_time	= db.Column(db.TIME)
+    Slot_end_time	= db.Column(db.TIME)
+    Service_ID		= db.Column(db.Integer)
+    Reservation_ID	= db.Column(db.Integer)
+    Is_available	= db.Column(db.Boolean)
+
 class Operator(db.Model):
     __tablename__ = 'operators'
     

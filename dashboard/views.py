@@ -235,9 +235,142 @@ class CartView(ModelView):
     def is_accessible(self):
         return login.current_user.is_authenticated
 
+class ProductView(ModelView):
+    form_columns = ['productName', 'productDescription', 'productCost', 'productWeight', 'img_url',
+                    'productInStock']
+    column_list = ['id'] + form_columns[:5] + ['image', 'productInStock', 'Created_at', 'Modified_at']
+    column_labels = {'productName': 'Product Name',
+                     'productDescription': 'Product Description',
+                     'productCost': 'Product Cost',
+                     'productWeight': 'Product Weight',
+                     'img_url': 'Product Image URL',
+                     'productInStock': 'Product In Stock'}
+    form_extra_fields = {
+        'img_url': form.ImageUploadField(base_path=UPLOADED_IMAGES_DEST, url_relative_path='img/', namegen=imagename_uuid1_gen)
+    }
+    column_formatters = {
+        'image': list_thumbnail,
+        'img_url': lambda v, c, m, p: images.url(m.img_url) if m.img_url else None
+    }    
+
+    def on_model_change(self, form, model, is_created):
+        manage_updates(model, is_created)
+
+    def is_accessible(self):
+        return login.current_user.is_authenticated
+
+class CartDetailView(ModelView):
+    column_searchable_list = ['Cart_ID', 'parent_com.categories.Category_Name', 'parent_prod.productName']
+    form_columns = ['Cart_ID', 'Prodcut_ID', 'Company_ID', 'Quantity', 'DatePlaced']
+    column_list = ['id', 'Cart_ID', 'Prodcut_ID', 'parent_prod.productName', 'Company_ID', 'parent_com.Company_Name', 'Quantity', 'DatePlaced']
+    column_labels = {'parent_prod.productName': 'Product Name',
+                     'parent_com.Company_Name': 'Company Name',
+                     'DatePlaced': 'Date Placed'}
+    
+    def is_accessible(self):
+        return login.current_user.is_authenticated
+
+class ProductGalleryView(ModelView):
+    column_searchable_list = ['product_id', 'parent_prod.productName']
+    form_columns = ['product_id', 'img_url']
+    column_list = ['id', 'product_id', 'parent_prod.productName', 'img_url', 'product_image']
+    column_labels = {
+        'parent_prod.productName': 'Product Name',
+        'img_url': 'Product Image URL' 
+    }
+    form_extra_fields = {
+        'img_url': form.ImageUploadField(base_path=UPLOADED_IMAGES_DEST, url_relative_path='img/', namegen=imagename_uuid1_gen)
+    }
+    column_formatters = {
+        'product_image': list_thumbnail,
+        'img_url': lambda v, c, m, p: images.url(m.img_url) if m.img_url else None
+    }
+    
+    def is_accessible(self):
+        return login.current_user.is_authenticated
+
+class ServicesCatView(ModelView):
+    column_searchable_list = ['Servicecat_ID', 'parent_com.Company_Name', 'Category_Name']
+    form_columns = ['Company_ID', 'Category_Name', 'Parent_Category_ID', 'img_url']
+    column_list = ['Servicecat_ID', 'Company_ID', 'parent_com.Company_Name', 'Category_Name',
+                   'Parent_Category_ID', 'img_url', 'icon', 'Created_at', 'Modified_at']
+    column_labels = {
+        'parent_com.Company_Name': 'Company Name',
+        'img_url': 'Icon URL' 
+    }
+    form_extra_fields = {
+        'img_url': form.ImageUploadField(base_path=UPLOADED_IMAGES_DEST, url_relative_path='img/', namegen=imagename_uuid1_gen)
+    }
+    column_formatters = {
+        'icon': list_thumbnail,
+        'img_url': lambda v, c, m, p: images.url(m.img_url) if m.img_url else None
+    }
+
+    def on_model_change(self, form, model, is_created):
+        manage_updates(model, is_created)
+    
+    def is_accessible(self):
+        return login.current_user.is_authenticated and login.current_user.IS_admin
+
+class ServiceSlotView(ModelView):
+    column_searchable_list = ['Slot_ID', 'Service_ID', 'Reservation_ID']
+    column_display_pk = True
+    
+    def is_accessible(self):
+        return login.current_user.is_authenticated
+
+class UserView(ModelView):
+
+    column_searchable_list = ['User_ID', 'First_name', 'Last_name', 'Address1', 'Address2',
+                              'Mobile_num', 'Email', 'Username', 'invoice_name', 'invoice_address']
+    a = [m.key for m in User().__table__.columns]
+    all_attrs = ['img_url' if c == 'Photo_url' else c for c in a]
+    form_columns = all_attrs[1:]
+    column_list = all_attrs[:20] + ['photo'] + all_attrs[20:]
+    column_labels = {
+        'img_url': 'Photo URL' 
+    }
+    form_extra_fields = {
+        'img_url': form.ImageUploadField(base_path=UPLOADED_IMAGES_DEST, url_relative_path='img/', namegen=imagename_uuid1_gen)
+    }
+    column_formatters = {
+        'photo': list_thumbnail,
+        'img_url': lambda v, c, m, p: images.url(m.img_url) if m.img_url else None
+    }
+    
+    @property
+    def can_edit(self):
+        return login.current_user.is_authenticated
+
+    @property
+    def can_delete(self):
+        return login.current_user.is_authenticated
+    
+    def get_query(self):
+        if login.current_user.is_authenticated:
+            return self.session.query(self.model)
+        
+        return self.session.query(self.model).filter(False)
+
+    def get_count_query(self):
+        if login.current_user.is_authenticated:
+            return self.session.query(func.count('*'))
+        
+        return 0
+
+    def on_model_change(self, form, model, is_created):
+        manage_updates(model, is_created)
+
+    def is_accessible(self):
+        return True
+
 # Delete callbacks
 listen(Category, 'after_delete', delete_img)
 listen(Company, 'after_delete', delete_img)
+listen(Product, 'after_delete', delete_img)
+listen(ProductGallery, 'after_delete', delete_img)
+listen(ServicesCat, 'after_delete', delete_img)
+listen(User, 'after_delete', delete_img)
 
 admin = Admin(app, 'Dashboard', index_view=HomeLoginView(), base_template='master.html')
 admin.add_view(CategoriesView(Category, db.session, category="Category"))
@@ -246,4 +379,10 @@ admin.add_view(CompanyView(Company, db.session, category="Company"))
 admin.add_view(CompanyDeliveryView(CompanyDelivery, db.session, category="Company"))
 admin.add_view(CompanyTimetableView(CompanyTimetable, db.session, category="Company"))
 admin.add_view(OperatorView(Operator, db.session, category="Company"))
-admin.add_view(CartView(Cart, db.session, category="Product"))
+admin.add_view(CartView(Cart, db.session, category="Cart"))
+admin.add_view(CartDetailView(CartDetail, db.session, category="Cart"))
+admin.add_view(ProductView(Product, db.session, category="Product"))
+admin.add_view(ProductGalleryView(ProductGallery, db.session, category="Product"))
+admin.add_view(ServicesCatView(ServicesCat, db.session, category="Services"))
+admin.add_view(ServiceSlotView(ServiceSlot, db.session, category="Services"))
+admin.add_view(UserView(User, db.session, name='User Registration'))
